@@ -28,7 +28,7 @@ function InterviewApp() {
   const volumeSamplesRef = useRef([]);
   const pauseCountRef = useRef(0);
   const lastTranscriptLengthRef = useRef(0);
-  const lastSpeakingTimeRef = useRef(null);
+  const lastSilenceStartRef = useRef(null);
   const isSpeakingRef = useRef(false);
 
   // Fetch questions from API
@@ -116,17 +116,18 @@ function InterviewApp() {
           // User is speaking
           if (!isSpeakingRef.current) {
             // Transition from silence to speaking
-            if (lastSpeakingTimeRef.current && (now - lastSpeakingTimeRef.current) >= PAUSE_DURATION_MS) {
+            if (lastSilenceStartRef.current && (now - lastSilenceStartRef.current) >= PAUSE_DURATION_MS) {
               // Count this as a pause if there was at least 1 second of silence
               pauseCountRef.current += 1;
             }
             isSpeakingRef.current = true;
+            lastSilenceStartRef.current = null;
           }
-          lastSpeakingTimeRef.current = now;
         } else {
           // User is silent
-          if (isSpeakingRef.current && lastSpeakingTimeRef.current) {
-            // Just stopped speaking, mark the time
+          if (isSpeakingRef.current) {
+            // Just stopped speaking, mark the start of silence period
+            lastSilenceStartRef.current = now;
             isSpeakingRef.current = false;
           }
         }
@@ -149,7 +150,7 @@ function InterviewApp() {
         volumeSamplesRef.current = [];
         pauseCountRef.current = 0;
         lastTranscriptLengthRef.current = 0;
-        lastSpeakingTimeRef.current = Date.now();
+        lastSilenceStartRef.current = null;
         isSpeakingRef.current = false;
         // start simple timer
         let startedAt = Date.now();

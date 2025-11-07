@@ -28,6 +28,8 @@ function InterviewApp() {
   const volumeSamplesRef = useRef([]);
   const pauseCountRef = useRef(0);
   const lastTranscriptLengthRef = useRef(0);
+  const lastSilenceStartRef = useRef(null);
+  const isSpeakingRef = useRef(false);
 
   // Fetch questions from API
   useEffect(() => {
@@ -104,6 +106,32 @@ function InterviewApp() {
           dataArrayRef.current.reduce((a, b) => a + b, 0) / bufferLength;
         setVolume(avg);
         volumeSamplesRef.current.push(avg);
+        
+        // Detect pauses based on volume threshold
+        const SILENCE_THRESHOLD = 10; // Volume level considered as silence
+        const PAUSE_DURATION_MS = 1000; // 1 second of silence counts as a pause
+        const now = Date.now();
+        
+        if (avg > SILENCE_THRESHOLD) {
+          // User is speaking
+          if (!isSpeakingRef.current) {
+            // Transition from silence to speaking
+            if (lastSilenceStartRef.current && (now - lastSilenceStartRef.current) >= PAUSE_DURATION_MS) {
+              // Count this as a pause if there was at least 1 second of silence
+              pauseCountRef.current += 1;
+            }
+            isSpeakingRef.current = true;
+            lastSilenceStartRef.current = null;
+          }
+        } else {
+          // User is silent
+          if (isSpeakingRef.current) {
+            // Just stopped speaking, mark the start of silence period
+            lastSilenceStartRef.current = now;
+            isSpeakingRef.current = false;
+          }
+        }
+        
         if (isRecording) requestAnimationFrame(checkVolume);
       };
       checkVolume();
@@ -122,6 +150,8 @@ function InterviewApp() {
         volumeSamplesRef.current = [];
         pauseCountRef.current = 0;
         lastTranscriptLengthRef.current = 0;
+        lastSilenceStartRef.current = null;
+        isSpeakingRef.current = false;
         // start simple timer
         let startedAt = Date.now();
         setElapsedSec(0);
@@ -142,11 +172,6 @@ function InterviewApp() {
           }
         }
         setTranscript(tempTranscript.current + current);
-        const len = (tempTranscript.current + current).trim().length;
-        if (len <= lastTranscriptLengthRef.current) {
-          pauseCountRef.current += 1;
-        }
-        lastTranscriptLengthRef.current = len;
       };
 
       recognition.onerror = (e) => {
